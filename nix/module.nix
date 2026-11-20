@@ -1,5 +1,6 @@
 # NixOS module for Jovian-NixOS (https://github.com/Jovian-Experiments/Jovian-NixOS).
-self:
+# Imported from flake.nix via flake-parts' importApply.
+{ withSystem }:
 {
   config,
   lib,
@@ -28,7 +29,7 @@ in
 
     package = mkOption {
       type = types.package;
-      default = self.packages.${pkgs.stdenv.hostPlatform.system}.decky-bedtime;
+      default = withSystem pkgs.stdenv.hostPlatform.system ({ config, ... }: config.packages.decky-bedtime);
       defaultText = lib.literalExpression "decky-bedtime.packages.\${system}.decky-bedtime";
       description = "The Bedtime plugin package.";
     };

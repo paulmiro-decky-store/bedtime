@@ -76,7 +76,7 @@ Options under `jovian.decky-loader.bedtime`:
 
 The plugin is copied into Decky's plugin directory in `decky-loader.service`'s `preStart`. Decky restarts when the package or the fixed address/port change.
 
-The flake also provides `packages.<system>.decky-bedtime`, `overlays.default` and a dev shell.
+The flake (built with [flake-parts](https://flake.parts)) also provides `packages.<system>.decky-bedtime` and a dev shell.
 
 ## Manual install (SteamOS)
 

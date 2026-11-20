@@ -1,62 +1,64 @@
 {
   description = "Bedtime: a Decky Loader plugin to set an end-of-play time from your phone";
 
-  inputs.nixpkgs.url = "https://channels.nixos.org/nixos-unstable/nixexprs.tar.xz";
+  inputs = {
+    nixpkgs.url = "https://channels.nixos.org/nixos-unstable/nixexprs.tar.xz";
+    flake-parts = {
+      url = "github:hercules-ci/flake-parts";
+      inputs.nixpkgs-lib.follows = "nixpkgs";
+    };
+  };
 
   outputs =
-    { self, nixpkgs }:
-    let
-      systems = [
-        "x86_64-linux"
-        "aarch64-linux"
-      ];
-      forAllSystems = f: nixpkgs.lib.genAttrs systems (system: f nixpkgs.legacyPackages.${system});
-    in
-    {
-      packages = forAllSystems (pkgs: rec {
-        decky-bedtime = pkgs.callPackage ./nix/package.nix { };
-        default = decky-bedtime;
-      });
+    inputs@{ flake-parts, ... }:
+    flake-parts.lib.mkFlake { inherit inputs; } (
+      { withSystem, ... }:
+      {
+        systems = [
+          "x86_64-linux"
+          "aarch64-linux"
+        ];
 
-      overlays.default = final: _prev: {
-        decky-bedtime = final.callPackage ./nix/package.nix { };
-      };
+        perSystem =
+          { config, pkgs, ... }:
+          let
+            python = pkgs.python3.withPackages (ps: [ ps.aiohttp ]);
+          in
+          {
+            packages = {
+              decky-bedtime = pkgs.callPackage ./nix/package.nix { };
+              default = config.packages.decky-bedtime;
+            };
 
-      nixosModules = rec {
-        decky-bedtime = import ./nix/module.nix self;
-        default = decky-bedtime;
-      };
+            checks = {
+              package = config.packages.decky-bedtime;
+              python-tests =
+                pkgs.runCommand "decky-bedtime-python-tests" { nativeBuildInputs = [ python ]; }
+                  ''
+                    cp ${./main.py} main.py
+                    cp -r ${./py_modules} py_modules
+                    cp -r ${./tests} tests
+                    chmod -R u+w .
+                    python3 -m unittest discover -s tests -v
+                    touch $out
+                  '';
+            };
 
-      checks = forAllSystems (
-        pkgs:
-        {
-          package = self.packages.${pkgs.stdenv.hostPlatform.system}.decky-bedtime;
-          python-tests =
-            pkgs.runCommand "decky-bedtime-python-tests"
-              {
-                nativeBuildInputs = [ (pkgs.python3.withPackages (ps: [ ps.aiohttp ])) ];
-              }
-              ''
-                cp -r ${./main.py} main.py
-                cp -r ${./py_modules} py_modules
-                cp -r ${./tests} tests
-                chmod -R u+w .
-                python3 -m unittest discover -s tests -v
-                touch $out
-              '';
-        }
-      );
+            devShells.default = pkgs.mkShell {
+              packages = [
+                pkgs.nodejs
+                pkgs.pnpm
+                python
+              ];
+            };
 
-      devShells = forAllSystems (pkgs: {
-        default = pkgs.mkShell {
-          packages = [
-            pkgs.nodejs
-            pkgs.pnpm
-            (pkgs.python3.withPackages (ps: [ ps.aiohttp ]))
-          ];
+            formatter = pkgs.nixfmt;
+          };
+
+        flake.nixosModules = rec {
+          decky-bedtime = flake-parts.lib.importApply ./nix/module.nix { inherit withSystem; };
+          default = decky-bedtime;
         };
-      });
-
-      formatter = forAllSystems (pkgs: pkgs.nixfmt);
-    };
+      }
+    );
 }

@@ -6,6 +6,7 @@ import socket
 import sys
 import tempfile
 import unittest
+from datetime import datetime, timedelta
 import urllib.error
 import urllib.request
 
@@ -25,6 +26,10 @@ def free_port() -> int:
     with socket.socket() as s:
         s.bind(("127.0.0.1", 0))
         return s.getsockname()[1]
+
+
+def in_hours(hours: float) -> str:
+    return (datetime.now() + timedelta(hours=hours)).strftime("%H:%M")
 
 
 def http(method, url, body=None):
@@ -62,7 +67,7 @@ class BackendTests(unittest.IsolatedAsyncioTestCase):
     async def post(self, path, body):
         return await asyncio.to_thread(http, "POST", self.base + path, body)
 
-    async def test_set_once_then_locked(self):
+    async def test_set_then_only_earlier(self):
         code, page = await self.get("/")
         self.assertEqual(code, 200)
         self.assertIn('type="time"', page)
@@ -73,12 +78,27 @@ class BackendTests(unittest.IsolatedAsyncioTestCase):
         code, body = await self.post("/api/bedtime", {"time": "25:00"})
         self.assertEqual(code, 400)
 
-        code, body = await self.post("/api/bedtime", {"time": "23:59"})
+        t3, t2, t1 = in_hours(3), in_hours(2), in_hours(1)
+        code, body = await self.post("/api/bedtime", {"time": t2})
         self.assertEqual(code, 200, body)
-        self.assertEqual(json.loads(body)["bedtime"], "23:59")
-        self.assertEqual(fake_decky.events[0][0], "bedtime_set")
+        self.assertEqual(json.loads(body)["bedtime"], t2)
+        self.assertEqual(fake_decky.events[-1][0], "bedtime_set")
+        self.assertFalse(fake_decky.events[-1][1]["changed"])
 
-        code, body = await self.post("/api/bedtime", {"time": "23:00"})
+        # Later or equal: rejected.
+        for later in (t3, t2):
+            code, body = await self.post("/api/bedtime", {"time": later})
+            self.assertEqual(code, 409, later)
+            self.assertIn("earlier", json.loads(body)["error"])
+
+        # Earlier: accepted.
+        code, body = await self.post("/api/bedtime", {"time": t1})
+        self.assertEqual(code, 200, body)
+        self.assertEqual(json.loads(body)["bedtime"], t1)
+        self.assertTrue(fake_decky.events[-1][1]["changed"])
+
+        # Can't go back to the later time after moving earlier.
+        code, _ = await self.post("/api/bedtime", {"time": t2})
         self.assertEqual(code, 409)
 
         # Survives a plugin reload within the same boot.
@@ -86,10 +106,18 @@ class BackendTests(unittest.IsolatedAsyncioTestCase):
         self.plugin = main.Plugin()
         await self.plugin._main()
         status = await self.plugin.get_status()
-        self.assertEqual(status["bedtime"], "23:59")
+        self.assertEqual(status["bedtime"], t1)
+
+    async def test_no_change_after_bedtime_reached(self):
+        await self.post("/api/bedtime", {"time": in_hours(2)})
+        self.plugin.state.deadline_boot = bedtime_core.boottime() - 1
+        await self.plugin._tick()
+        code, body = await self.post("/api/bedtime", {"time": in_hours(1)})
+        self.assertEqual(code, 409)
+        self.assertIn("reached", json.loads(body)["error"])
 
     async def test_warnings_and_reached(self):
-        await self.post("/api/bedtime", {"time": "23:59"})
+        await self.post("/api/bedtime", {"time": in_hours(2)})
         st = self.plugin.state
         # Pretend 14 minutes are left.
         st.deadline_boot = bedtime_core.boottime() + 14 * 60

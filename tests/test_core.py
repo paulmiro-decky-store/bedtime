@@ -61,6 +61,18 @@ class StateTests(unittest.TestCase):
         self.assertEqual(sorted(st.warned), [5, 15])
         self.assertEqual(st.due_warnings(3 * 60), [1])
 
+    def test_is_earlier_than(self):
+        now = datetime(2026, 11, 20, 20, 0, 0)
+        a = BedtimeState.create("22:00", now=now, now_boot=0.0, boot_id="b")
+        b = BedtimeState.create("21:00", now=now, now_boot=0.0, boot_id="b")
+        tomorrow = BedtimeState.create("19:00", now=now, now_boot=0.0, boot_id="b")
+        self.assertTrue(b.is_earlier_than(a))
+        self.assertFalse(a.is_earlier_than(b))
+        self.assertFalse(a.is_earlier_than(a))
+        self.assertFalse(tomorrow.is_earlier_than(a))   # 19:00 means tomorrow
+        other_boot = BedtimeState.create("21:00", now=now, now_boot=0.0, boot_id="x")
+        self.assertFalse(other_boot.is_earlier_than(a))
+
     def test_store_discards_other_boot(self):
         with tempfile.TemporaryDirectory() as d:
             st = BedtimeState.create("21:00", boot_id="boot-a")

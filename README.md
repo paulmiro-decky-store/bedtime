@@ -2,8 +2,8 @@
 
 Set an end-of-play time for a Steam Deck (or any Decky Loader device) from a phone.
 
-- The device serves a small web page (default `http://<device-ip>:19114/`) with one time picker and a **Set bedtime** button.
-- Once set, the bedtime is **locked until the next reboot**. It can't be changed from the web page or from the device.
+- The device serves a small web page (default `http://<device-ip>:19114/`) with one time picker and a **Set bedtime** button (**Move earlier** once a bedtime is set).
+- Once set, the bedtime can only be **moved earlier** until the next reboot. The web page refuses a later time, and so does the device itself (HTTP 409), so calling the API directly doesn't get around it. After bedtime is reached it can't be changed at all.
 - Steam toasts appear **15, 5 and 1 minute** before bedtime.
 - At bedtime the running game is closed and **game launches are blocked until the device restarts**.
 - Nothing carries over a reboot. The bedtime is kept in `/run` and tagged with the kernel boot ID, so a Decky restart keeps it but a reboot clears it.

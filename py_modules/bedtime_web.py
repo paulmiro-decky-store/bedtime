@@ -10,8 +10,8 @@ StatusFn = Callable[[], dict[str, Any]]
 SetFn = Callable[[str], Awaitable[dict[str, Any]]]
 
 
-class BedtimeAlreadySet(Exception):
-    pass
+class BedtimeRejected(Exception):
+    """The new bedtime is not allowed (e.g. later than the current one)."""
 
 
 PAGE = """<!doctype html>
@@ -49,31 +49,45 @@ PAGE = """<!doctype html>
 <main>
   <h1>Bedtime</h1>
 
-  <form id="form" class="card" hidden>
-    <label for="time">Stop playing at</label>
-    <input id="time" type="time" required>
-    <p id="preview" class="hint"></p>
-    <button id="submit" type="submit">Set bedtime</button>
-    <p class="hint">Can't be changed until the device restarts.</p>
-  </form>
-
   <section id="locked" class="card" hidden>
     <p class="hint" id="locked-label">Bedtime</p>
     <p class="big" id="locked-time"></p>
     <p class="hint" id="locked-left"></p>
   </section>
 
+  <form id="form" class="card" hidden>
+    <label for="time" id="time-label">Stop playing at</label>
+    <input id="time" type="time" required>
+    <p id="preview" class="hint"></p>
+    <button id="submit" type="submit">Set bedtime</button>
+    <p class="hint" id="form-note">Can only be moved earlier until the device restarts.</p>
+  </form>
+
   <p id="error" class="err" hidden></p>
 </main>
 <script>
 const $ = (id) => document.getElementById(id);
-let defaultsApplied = false;
+let current = null;      // last status from the device
+let shownFor = undefined;  // bedtime the picker was last pre-filled for
 
-function untilText(hhmm) {
+function nextOccurrence(hhmm) {
   const [h, m] = hhmm.split(":").map(Number);
   const now = new Date();
   const t = new Date(now); t.setHours(h, m, 0, 0);
   if (t <= now) t.setDate(t.getDate() + 1);
+  return t;
+}
+
+// Once a bedtime is set, only an earlier one is accepted (the device checks too).
+function allowed(hhmm) {
+  if (!current || !current.set) return true;
+  if (current.reached) return false;
+  return nextOccurrence(hhmm).getTime() < current.deadline * 1000;
+}
+
+function untilText(hhmm) {
+  const now = new Date();
+  const t = nextOccurrence(hhmm);
   const mins = Math.round((t - now) / 60000);
   const hh = Math.floor(mins / 60), mm = mins % 60;
   const span = hh ? `${hh} h ${mm} min` : `${mm} min`;
@@ -82,24 +96,37 @@ function untilText(hhmm) {
 }
 
 function render(s) {
-  $("form").hidden = s.set;
+  current = s;
   $("locked").hidden = !s.set;
+  $("form").hidden = s.reached;
   if (s.set) {
     $("locked-time").textContent = s.bedtime;
     $("locked-label").textContent = s.reached ? "Bedtime reached" : "Bedtime set for";
     $("locked-left").textContent = s.reached
       ? "Games are blocked until the device restarts."
-      : `${s.remainingText} left. Locked until the device restarts.`;
-  } else if (!defaultsApplied) {
-    $("time").value = s.defaultBedtime;
-    defaultsApplied = true;
-    updatePreview();
+      : `${s.remainingText} left.`;
+    $("time-label").textContent = "Move bedtime earlier";
+    $("submit").textContent = "Move earlier";
+  } else {
+    $("time-label").textContent = "Stop playing at";
+    $("submit").textContent = "Set bedtime";
   }
+  const key = s.set ? s.bedtime : null;
+  if (shownFor !== key) {   // pre-fill once per state change, don't fight the user
+    shownFor = key;
+    $("time").value = s.set ? s.bedtime : s.defaultBedtime;
+  }
+  updatePreview();
 }
 
 function updatePreview() {
   const v = $("time").value;
-  $("preview").textContent = v ? untilText(v) : "";
+  const ok = v && allowed(v);
+  if (!v) $("preview").textContent = "";
+  else if (!ok) $("preview").textContent = `Must be earlier than ${current.bedtime}.`;
+  else $("preview").textContent = untilText(v);
+  $("preview").classList.toggle("err", Boolean(v) && !ok);
+  $("submit").disabled = !ok;
 }
 
 function showError(msg) { $("error").textContent = msg; $("error").hidden = !msg; }
@@ -116,8 +143,8 @@ $("time").addEventListener("input", updatePreview);
 $("form").addEventListener("submit", async (ev) => {
   ev.preventDefault();
   const time = $("time").value;
-  if (!time) return;
-  if (!confirm(`Set bedtime to ${time}? ${untilText(time)}.\\nThis can't be changed until the device restarts.`)) return;
+  if (!time || !allowed(time)) { updatePreview(); return; }
+  if (!confirm(`Set bedtime to ${time}? ${untilText(time)}.\\nAfter this it can only be moved earlier until the device restarts.`)) return;
   $("submit").disabled = true;
   try {
     const r = await fetch("api/bedtime", {
@@ -128,7 +155,7 @@ $("form").addEventListener("submit", async (ev) => {
     if (!r.ok) showError(body.error || "Failed to set bedtime.");
     else { showError(""); render(body); }
   } catch (e) { showError("Can't reach the device."); }
-  $("submit").disabled = false;
+  if (current) render(current); else $("submit").disabled = false;
 });
 
 refresh();
@@ -156,10 +183,8 @@ def make_app(get_status: StatusFn, set_bedtime: SetFn) -> web.Application:
         value = data.get("time") if isinstance(data, dict) else None
         try:
             result = await set_bedtime(value)
-        except BedtimeAlreadySet:
-            return web.json_response(
-                {"error": "Bedtime is already set and locked until the device restarts."},
-                status=409)
+        except BedtimeRejected as exc:
+            return web.json_response({"error": str(exc)}, status=409)
         except ValueError as exc:
             return web.json_response({"error": str(exc)}, status=400)
         return web.json_response(result)

@@ -19,6 +19,7 @@ export interface Status {
   settings: Settings;
   managed: (keyof Settings)[];
   now: string;
+  changed?: boolean;
 }
 
 export const getStatus = callable<[], Status>("get_status");

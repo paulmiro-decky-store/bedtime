@@ -21,7 +21,7 @@ export default definePlugin(() => {
   const onSet = (s: Status) =>
     toaster.toast({
       title: TITLE,
-      body: `Bedtime set to ${s.bedtime} (${s.remainingText} left).`,
+      body: `Bedtime ${s.changed ? "moved earlier to" : "set to"} ${s.bedtime} (${s.remainingText} left).`,
       duration: 8000,
     });
 

@@ -24,7 +24,7 @@ from bedtime_core import (  # noqa: E402
     status_payload,
     validate_settings_patch,
 )
-from bedtime_web import BedtimeAlreadySet, WebServer, make_app  # noqa: E402
+from bedtime_web import BedtimeRejected, WebServer, make_app  # noqa: E402
 
 MANAGED_CONFIG = os.environ.get("DECKY_BEDTIME_CONFIG", "/etc/decky-bedtime/config.json")
 TICK_SECONDS = 1.0
@@ -130,13 +130,21 @@ class Plugin:
     async def _set_bedtime_from_web(self, value: Any) -> dict[str, Any]:
         parse_hhmm(value)  # raises ValueError for bad input
         async with self._set_lock:
-            if self.state is not None:
-                raise BedtimeAlreadySet()
+            old = self.state
             state = BedtimeState.create(value)
+            if old is not None:
+                # Once set, the bedtime can only be moved earlier.
+                if old.reached or old.remaining() <= 0:
+                    raise BedtimeRejected("Bedtime has already been reached.")
+                if not state.is_earlier_than(old):
+                    raise BedtimeRejected(
+                        f"Bedtime can only be moved earlier than {old.bedtime}.")
             self.store.save(state)
             self.state = state
         status = self._status()
-        decky.logger.info("Bedtime set to %s (%s left)", state.bedtime, status["remainingText"])
+        status["changed"] = old is not None
+        decky.logger.info("Bedtime %s %s (%s left)", "moved to" if old else "set to",
+                          state.bedtime, status["remainingText"])
         await decky.emit("bedtime_set", status)
         return status
 

@@ -170,6 +170,14 @@ class BedtimeState:
         state.warned = [mins for mins in WARN_MINUTES if seconds <= mins * 60]
         return state
 
+    def is_earlier_than(self, other: "BedtimeState") -> bool:
+        """True if this deadline is earlier than `other` (same boot).
+
+        Bedtimes have minute resolution; the margin keeps re-entering the same
+        time from passing due to clock jitter between the two calculations.
+        """
+        return self.boot_id == other.boot_id and self.deadline_boot < other.deadline_boot - 30
+
     def due_warnings(self, now_boot: Optional[float] = None) -> list[int]:
         """Warning thresholds (minutes) crossed but not yet announced."""
         rem = self.remaining(now_boot)

@@ -41,7 +41,7 @@ export function Content() {
       detail = "Games are blocked until the device restarts.";
     } else {
       headline = `Bedtime ${status.bedtime}`;
-      detail = `${status.remainingText} left. Locked until the device restarts.`;
+      detail = `${status.remainingText} left. Can only be moved earlier until the device restarts.`;
     }
   }
 

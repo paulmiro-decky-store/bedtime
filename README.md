@@ -38,7 +38,7 @@ The plugin uses the `_root` flag. It needs root to signal game processes owned b
     nixpkgs.url = "https://channels.nixos.org/nixos-unstable/nixexprs.tar.xz";
     jovian.url = "github:Jovian-Experiments/Jovian-NixOS";
     jovian.inputs.nixpkgs.follows = "nixpkgs";
-    decky-bedtime.url = "github:paulmiro/decky-bedtime";
+    decky-bedtime.url = "github:paulmiro-decky-store/bedtime";
     decky-bedtime.inputs.nixpkgs.follows = "nixpkgs";
   };
 
@@ -100,4 +100,4 @@ The backend tests run `main.py` against a fake `decky` module and use the real w
 
 ## License
 
-BSD-3-Clause
+[The Unlicense](LICENSE) (public domain).

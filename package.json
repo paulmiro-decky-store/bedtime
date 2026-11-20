@@ -8,7 +8,7 @@
     "watch": "rollup -c -w",
     "typecheck": "tsc --noEmit"
   },
-  "license": "BSD-3-Clause",
+  "license": "Unlicense",
   "devDependencies": {
     "@decky/rollup": "^1.0.2",
     "@decky/ui": "^4.16.5",

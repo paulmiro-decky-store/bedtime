@@ -55,7 +55,7 @@ stdenvNoCC.mkDerivation (finalAttrs: {
 
   meta = {
     description = "Decky Loader plugin: set an end-of-play time from your phone";
-    license = lib.licenses.bsd3;
+    license = lib.licenses.unlicense;
     platforms = lib.platforms.linux;
   };
 })

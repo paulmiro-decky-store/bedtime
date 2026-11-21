@@ -107,6 +107,27 @@ class BackendTests(unittest.IsolatedAsyncioTestCase):
         status = await self.plugin.get_status()
         self.assertEqual(status["bedtime"], t1)
 
+    async def test_set_from_deck_slider(self):
+        status = await self.plugin.set_bedtime_in(120)
+        self.assertTrue(status["set"])
+        self.assertTrue(115 * 60 <= status["remainingSeconds"] <= 120 * 60)
+        self.assertFalse(fake_decky.events[-1][1]["changed"])
+
+        with self.assertRaisesRegex(Exception, "earlier"):
+            await self.plugin.set_bedtime_in(180)
+        with self.assertRaisesRegex(Exception, "between"):
+            await self.plugin.set_bedtime_in(0)
+
+        status = await self.plugin.set_bedtime_in(60)
+        self.assertTrue(status["remainingSeconds"] <= 60 * 60)
+        self.assertTrue(fake_decky.events[-1][1]["changed"])
+
+        # The web page sees the same bedtime and the same rule.
+        code, body = await self.post("/api/bedtime", {"time": in_hours(1.5)})
+        self.assertEqual(code, 409)
+        code, body = await self.get("/api/status")
+        self.assertEqual(json.loads(body)["bedtime"], status["bedtime"])
+
     async def test_no_change_after_bedtime_reached(self):
         await self.post("/api/bedtime", {"time": in_hours(2)})
         self.plugin.state.deadline_boot = bedtime_core.boottime() - 1

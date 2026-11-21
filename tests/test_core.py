@@ -59,6 +59,15 @@ class StateTests(unittest.TestCase):
         self.assertEqual(sorted(st.warned), [5, 15])
         self.assertEqual(st.due_warnings(3 * 60), [1])
 
+    def test_create_in(self):
+        now = datetime(2026, 11, 20, 23, 10, 40)
+        st = BedtimeState.create_in(90, now=now, now_boot=0.0, boot_id="b")
+        self.assertEqual(st.bedtime, "00:40")                 # crosses midnight
+        self.assertEqual(st.remaining(0.0), 90 * 60 - 40)     # rounded down to the minute
+        for bad in (0, -5, 24 * 60, 1.5, "30", True, None):
+            with self.assertRaises(ValueError):
+                BedtimeState.create_in(bad, now=now, now_boot=0.0, boot_id="b")
+
     def test_is_earlier_than(self):
         now = datetime(2026, 11, 20, 20, 0, 0)
         a = BedtimeState.create("22:00", now=now, now_boot=0.0, boot_id="b")

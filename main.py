@@ -6,7 +6,7 @@ import socket
 import sys
 import time
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 import decky
 
@@ -120,9 +120,13 @@ class Plugin:
 
     async def _set_bedtime_from_web(self, value: Any) -> dict[str, Any]:
         parse_hhmm(value)  # raises ValueError for bad input
+        return await self._apply_bedtime(lambda: BedtimeState.create(value))
+
+    async def _apply_bedtime(self, make_state: Callable[[], BedtimeState]) -> dict[str, Any]:
+        """Set a new bedtime; once one is set, only earlier ones are accepted."""
         async with self._set_lock:
             old = self.state
-            state = BedtimeState.create(value)
+            state = make_state()
             if old is not None:
                 # Once set, the bedtime can only be moved earlier.
                 if old.reached or old.remaining() <= 0:
@@ -213,6 +217,15 @@ class Plugin:
             now=datetime.now().isoformat(timespec="seconds"),
         )
         return status
+
+    async def set_bedtime_in(self, minutes: int) -> dict[str, Any]:
+        """From the Deck: bedtime `minutes` from now (same rules as the web page)."""
+        try:
+            BedtimeState.create_in(minutes)  # validate before taking the lock
+            await self._apply_bedtime(lambda: BedtimeState.create_in(minutes))
+        except (ValueError, BedtimeRejected) as exc:
+            raise Exception(str(exc)) from exc
+        return await self.get_status()
 
     async def save_settings(self, patch: dict[str, Any]) -> dict[str, Any]:
         try:

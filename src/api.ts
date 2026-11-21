@@ -22,4 +22,5 @@ export interface Status {
 }
 
 export const getStatus = callable<[], Status>("get_status");
+export const setBedtimeIn = callable<[minutes: number], Status>("set_bedtime_in");
 export const saveSettings = callable<[patch: Partial<Settings>], Status>("save_settings");

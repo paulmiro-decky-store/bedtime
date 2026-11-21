@@ -17,6 +17,8 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "listenAddress": "0.0.0.0",
     "port": 19114,
 }
+# Longest "stop in N minutes" bedtime; keeps HH:MM unambiguous (< 24 h).
+MAX_IN_MINUTES = 24 * 60 - 1
 HHMM_RE = re.compile(r"^([01]\d|2[0-3]):([0-5]\d)$")
 
 
@@ -132,13 +134,27 @@ class BedtimeState:
     def create(cls, hhmm: str, now: Optional[datetime] = None,
                now_boot: Optional[float] = None, boot_id: Optional[str] = None) -> "BedtimeState":
         now = now or datetime.now()
+        return cls._for_target(next_occurrence(hhmm, now), now, now_boot, boot_id)
+
+    @classmethod
+    def create_in(cls, minutes: Any, now: Optional[datetime] = None,
+                  now_boot: Optional[float] = None, boot_id: Optional[str] = None) -> "BedtimeState":
+        """Bedtime `minutes` from now, rounded down to the full minute."""
+        if isinstance(minutes, bool) or not isinstance(minutes, int) \
+                or not 1 <= minutes <= MAX_IN_MINUTES:
+            raise ValueError(f"minutes must be a whole number between 1 and {MAX_IN_MINUTES}")
+        now = now or datetime.now()
+        target = (now + timedelta(minutes=minutes)).replace(second=0, microsecond=0)
+        return cls._for_target(target, now, now_boot, boot_id)
+
+    @classmethod
+    def _for_target(cls, target: datetime, now: datetime, now_boot: Optional[float],
+                    boot_id: Optional[str]) -> "BedtimeState":
         now_boot = boottime() if now_boot is None else now_boot
-        target = next_occurrence(hhmm, now)
         seconds = (target - now).total_seconds()
-        h, m = parse_hhmm(hhmm)
         state = cls(
             boot_id=boot_id or read_boot_id(),
-            bedtime=f"{h:02d}:{m:02d}",
+            bedtime=f"{target.hour:02d}:{target.minute:02d}",
             deadline_wall=now.timestamp() + seconds,
             deadline_boot=now_boot + seconds,
             set_at_wall=now.timestamp(),

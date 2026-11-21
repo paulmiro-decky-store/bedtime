@@ -8,12 +8,12 @@ Set an end-of-play time for a Steam Deck (or any Decky Loader device) from a pho
 - At bedtime the running game is closed and **game launches are blocked until the device restarts**.
 - Nothing carries over a reboot. The bedtime is kept in the plugin's runtime directory, tagged with the kernel boot ID, so a Decky restart keeps it but a reboot clears it.
 
-The Quick Access menu shows the current bedtime, the time left and the web page's address. Its **Settings** screen has:
+The Quick Access menu shows the current bedtime, the time left and the web page's address. It can also set the bedtime: a **Stop playing in…** slider (15 min to 6 h, in 15-minute steps) shows the resulting clock time, e.g. `1 h 30 min → 22:45`, and **Set bedtime** asks for confirmation. Once a bedtime is set, the slider only goes up to just before it and the button says **Move bedtime earlier**. The same rules as on the web page apply, enforced by the backend.
+
+Its **Settings** screen has:
 
 - **Default bedtime**: only pre-fills the picker on the web page. It is never applied on its own.
 - **Listen address** and **port** for the web page.
-
-The bedtime can't be set on the device itself, because `@decky/ui` has no time-picker component.
 
 ## How enforcement works
 

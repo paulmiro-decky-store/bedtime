@@ -46,8 +46,7 @@ def http(method, url, body=None):
 class BackendTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.tmp = tempfile.TemporaryDirectory()
-        main.MANAGED_CONFIG = os.path.join(self.tmp.name, "managed.json")
-        main.pick_state_dir = lambda fallback: os.path.join(self.tmp.name, "state")
+        fake_decky.DECKY_PLUGIN_RUNTIME_DIR = os.path.join(self.tmp.name, "runtime")
         self.port = free_port()
         os.makedirs(fake_decky.DECKY_PLUGIN_SETTINGS_DIR, exist_ok=True)
         with open(os.path.join(fake_decky.DECKY_PLUGIN_SETTINGS_DIR, "settings.json"), "w") as fh:
@@ -131,7 +130,7 @@ class BackendTests(unittest.IsolatedAsyncioTestCase):
         code, body = await self.get("/api/status")
         self.assertTrue(json.loads(body)["reached"])
 
-    async def test_settings_and_managed(self):
+    async def test_settings(self):
         new_port = free_port()
         status = await self.plugin.save_settings({"port": new_port, "defaultBedtime": "19:45"})
         self.assertEqual(status["settings"]["defaultBedtime"], "19:45")
@@ -139,13 +138,6 @@ class BackendTests(unittest.IsolatedAsyncioTestCase):
         code, _ = await asyncio.to_thread(http, "GET", f"http://127.0.0.1:{new_port}/api/status")
         self.assertEqual(code, 200)
 
-        managed_port = free_port()
-        with open(main.MANAGED_CONFIG, "w") as fh:
-            json.dump({"port": managed_port, "listenAddress": None}, fh)
-        status = await self.plugin.save_settings({"port": 1234})
-        self.assertEqual(status["managed"], ["port"])
-        self.assertEqual(status["settings"]["port"], managed_port)
-        self.assertEqual(self.plugin.server.port, managed_port)
 
 
 if __name__ == "__main__":

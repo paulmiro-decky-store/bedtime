@@ -17,7 +17,6 @@ export interface Status {
   url: string | null;
   serverError: string | null;
   settings: Settings;
-  managed: (keyof Settings)[];
   now: string;
   changed?: boolean;
 }

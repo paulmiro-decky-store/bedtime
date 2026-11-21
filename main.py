@@ -15,10 +15,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "py_
 from bedtime_core import (  # noqa: E402
     BedtimeState,
     StateStore,
-    load_managed_config,
     normalize_settings,
     parse_hhmm,
-    pick_state_dir,
     signal_game_processes,
     find_game_reapers,
     status_payload,
@@ -26,7 +24,6 @@ from bedtime_core import (  # noqa: E402
 )
 from bedtime_web import BedtimeRejected, WebServer, make_app  # noqa: E402
 
-MANAGED_CONFIG = os.environ.get("DECKY_BEDTIME_CONFIG", "/etc/decky-bedtime/config.json")
 TICK_SECONDS = 1.0
 # After bedtime, give Steam this long to close the game itself before the
 # backend starts terminating game processes directly.
@@ -81,7 +78,7 @@ class Plugin:
     async def _main(self):
         self._set_lock = asyncio.Lock()
         self._termed = {}
-        self.store = StateStore(pick_state_dir(decky.DECKY_PLUGIN_RUNTIME_DIR))
+        self.store = StateStore(decky.DECKY_PLUGIN_RUNTIME_DIR)
         self.state = self.store.load()
         if self.state is not None:
             decky.logger.info("Restored bedtime %s for this boot", self.state.bedtime)
@@ -107,14 +104,8 @@ class Plugin:
 
     # --------------------------------------------------------------- settings
 
-    def _effective_settings(self) -> tuple[dict[str, Any], dict[str, Any]]:
-        managed = load_managed_config(MANAGED_CONFIG)
-        settings = _read_user_settings()
-        settings.update(managed)
-        return settings, managed
-
     async def _restart_server(self) -> None:
-        settings, _ = self._effective_settings()
+        settings = _read_user_settings()
         try:
             await self.server.start(settings["listenAddress"], settings["port"])
             decky.logger.info("Web UI listening on %s:%s", settings["listenAddress"], settings["port"])
@@ -124,7 +115,7 @@ class Plugin:
     # ------------------------------------------------------------------ state
 
     def _status(self) -> dict[str, Any]:
-        settings, _ = self._effective_settings()
+        settings = _read_user_settings()
         return status_payload(self.state, settings)
 
     async def _set_bedtime_from_web(self, value: Any) -> dict[str, Any]:
@@ -206,7 +197,7 @@ class Plugin:
     # ---------------------------------------------------- frontend callables
 
     async def get_status(self) -> dict[str, Any]:
-        settings, managed = self._effective_settings()
+        settings = _read_user_settings()
         status = status_payload(self.state, settings)
         address = self.server.address if self.server else settings["listenAddress"]
         port = self.server.port if self.server else settings["port"]
@@ -219,7 +210,6 @@ class Plugin:
             url=f"http://{host}:{port}/" if self.server and self.server.running else None,
             serverError=self.server.error if self.server else None,
             settings=settings,
-            managed=sorted(managed.keys()),
             now=datetime.now().isoformat(timespec="seconds"),
         )
         return status
@@ -229,14 +219,10 @@ class Plugin:
             clean = validate_settings_patch(patch)
         except ValueError as exc:
             raise Exception(str(exc)) from exc
-        _, managed = self._effective_settings()
-        for key in managed:
-            clean.pop(key, None)
         current = _read_user_settings()
         current.update(clean)
         _write_user_settings(current)
-        effective, _ = self._effective_settings()
-        if (effective["listenAddress"], effective["port"]) != (self.server.address, self.server.port) \
+        if (current["listenAddress"], current["port"]) != (self.server.address, self.server.port) \
                 or not self.server.running:
             await self._restart_server()
         return await self.get_status()

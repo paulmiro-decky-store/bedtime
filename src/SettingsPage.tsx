@@ -39,7 +39,6 @@ export function SettingsPage() {
     return <div style={{ marginTop: "50px", padding: "16px" }}>Loading…</div>;
   }
 
-  const managed = (key: keyof Settings) => status.managed.includes(key);
   const [hour, minute] = status.settings.defaultBedtime.split(":").map(Number);
 
   const save = async (patch: Partial<Settings>) => {
@@ -59,13 +58,8 @@ export function SettingsPage() {
   const setDefault = (h: number, m: number) => save({ defaultBedtime: `${pad(h)}:${pad(m)}` });
 
   const saveNetwork = async () => {
-    const patch: Partial<Settings> = {};
-    if (!managed("listenAddress")) patch.listenAddress = address.trim();
-    if (!managed("port")) patch.port = Number(port);
-    if (await save(patch)) setDirty(false);
+    if (await save({ listenAddress: address.trim(), port: Number(port) })) setDirty(false);
   };
-
-  const nixNote = "Set by the NixOS configuration.";
 
   return (
     <div style={{ marginTop: "40px", height: "calc(100% - 40px)", overflowY: "auto" }}>
@@ -96,9 +90,8 @@ export function SettingsPage() {
           <DialogControlsSectionHeader>Web server</DialogControlsSectionHeader>
           <TextField
             label="Listen address"
-            description={managed("listenAddress") ? nixNote : "0.0.0.0 listens on all interfaces."}
+            description="0.0.0.0 listens on all interfaces."
             value={address}
-            disabled={managed("listenAddress")}
             onChange={(e) => {
               setAddress(e.target.value);
               setDirty(true);
@@ -106,24 +99,20 @@ export function SettingsPage() {
           />
           <TextField
             label="Port"
-            description={managed("port") ? nixNote : undefined}
             value={port}
             mustBeNumeric
             rangeMin={1}
             rangeMax={65535}
-            disabled={managed("port")}
             onChange={(e) => {
               setPort(e.target.value);
               setDirty(true);
             }}
           />
-          {!(managed("listenAddress") && managed("port")) && (
-            <Field bottomSeparator="none">
-              <DialogButton disabled={!dirty || saving} onClick={saveNetwork}>
-                Save and restart web server
-              </DialogButton>
-            </Field>
-          )}
+          <Field bottomSeparator="none">
+            <DialogButton disabled={!dirty || saving} onClick={saveNetwork}>
+              Save and restart web server
+            </DialogButton>
+          </Field>
           <Field
             label="Currently"
             description={status.serverError ?? status.url ?? "Not running"}

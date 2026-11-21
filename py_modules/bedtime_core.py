@@ -109,28 +109,6 @@ def validate_settings_patch(patch: Any) -> dict[str, Any]:
     return clean
 
 
-def load_managed_config(path: str) -> dict[str, Any]:
-    """Read settings fixed by the system (e.g. the NixOS module).
-
-    Returns only the keys that are set; those are read-only in the UI.
-    """
-    try:
-        with open(path, "r", encoding="utf-8") as fh:
-            raw = json.load(fh)
-    except (OSError, ValueError):
-        return {}
-    if not isinstance(raw, dict):
-        return {}
-    managed: dict[str, Any] = {}
-    for key in ("listenAddress", "port"):
-        if raw.get(key) is not None:
-            try:
-                managed.update(validate_settings_patch({key: raw[key]}))
-            except ValueError:
-                pass
-    return managed
-
-
 # --------------------------------------------------------------------------
 # Bedtime state (lives only until reboot)
 # --------------------------------------------------------------------------
@@ -205,8 +183,9 @@ class BedtimeState:
 class StateStore:
     """Keeps the bedtime state in a file so a Decky restart doesn't clear it.
 
-    The file is tagged with the kernel boot id and ignored (and deleted) after
-    a reboot, so nothing carries over. /run is preferred because it is a tmpfs.
+    The file lives in the plugin's runtime directory, tagged with the kernel
+    boot id. After a reboot the id differs, so the file is ignored and deleted:
+    nothing carries over.
     """
 
     FILENAME = "bedtime-state.json"
@@ -242,18 +221,6 @@ class StateStore:
             os.remove(self.path)
         except OSError:
             pass
-
-
-def pick_state_dir(fallback: str) -> str:
-    """Prefer a tmpfs under /run (gone after reboot), else the fallback dir."""
-    candidate = "/run/decky-bedtime"
-    try:
-        os.makedirs(candidate, mode=0o700, exist_ok=True)
-        if os.access(candidate, os.W_OK):
-            return candidate
-    except OSError:
-        pass
-    return fallback
 
 
 # --------------------------------------------------------------------------

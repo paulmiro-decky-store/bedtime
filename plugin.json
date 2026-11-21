@@ -1,11 +1,16 @@
 {
   "name": "Bedtime",
   "author": "paulmiro",
-  "flags": ["_root"],
+  "flags": [
+    "_root"
+  ],
   "api_version": 1,
   "publish": {
-    "tags": ["parental-control", "time-limit", "bedtime"],
-    "description": "Set an end-of-play time from a phone. Warns 15/5/1 minutes before, then closes the game and blocks launches until reboot.",
-    "image": "https://opengraph.githubassets.com/1/SteamDeckHomebrew/PluginLoader"
+    "tags": [
+      "parental-control",
+      "time-limit",
+      "bedtime"
+    ],
+    "description": "Set an end-of-play time from a phone. Warns 15/5/1 minutes before, then closes the game and blocks launches until reboot."
   }
 }

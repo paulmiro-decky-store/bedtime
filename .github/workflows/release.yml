@@ -1,0 +1,37 @@
+# Publishes the plugin for decky-store-proxy (https://github.com/paulmiro/decky-store-proxy).
+# Release: bump "version" in package.json, commit, then
+#   git tag vX.Y.Z && git push origin main vX.Y.Z
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.9.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Test backend
+        env:
+          PYTHONDONTWRITEBYTECODE: "1" # keep __pycache__ out of the packaged py_modules/
+        run: |
+          pip install aiohttp
+          python -m unittest discover -s tests -v
+      - name: Build frontend
+        run: pnpm install --frozen-lockfile && pnpm run build
+      - uses: paulmiro/decky-store-proxy/actions/package-plugin@79acd23cca25086b63737e30ff5e2e0687e94bc9
+        with:
+          release: create

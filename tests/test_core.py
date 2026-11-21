@@ -1,4 +1,3 @@
-import json
 import os
 import sys
 import tempfile
@@ -11,7 +10,6 @@ from bedtime_core import (  # noqa: E402
     BedtimeState,
     StateStore,
     is_game_reaper,
-    load_managed_config,
     next_occurrence,
     normalize_settings,
     parse_hhmm,
@@ -107,14 +105,6 @@ class SettingsTests(unittest.TestCase):
         for bad in ({"port": 0}, {"port": True}, {"listenAddress": ""}, {"defaultBedtime": "9pm"}):
             with self.assertRaises(ValueError):
                 validate_settings_patch(bad)
-
-    def test_managed_config(self):
-        with tempfile.TemporaryDirectory() as d:
-            path = os.path.join(d, "c.json")
-            with open(path, "w") as fh:
-                json.dump({"listenAddress": None, "port": 8000}, fh)
-            self.assertEqual(load_managed_config(path), {"port": 8000})
-            self.assertEqual(load_managed_config(os.path.join(d, "missing")), {})
 
 
 class ProcessTests(unittest.TestCase):

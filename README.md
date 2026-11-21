@@ -58,7 +58,7 @@ Download `decky-bedtime-decky-plugin.zip` from a release and use **Decky → Set
 `.github/workflows/release.yml` builds the plugin and runs the proxy's [`package-plugin`](https://github.com/paulmiro/decky-store-proxy/blob/main/docs/plugin-development.md) action, which checks NixOS compatibility, creates the release and attaches the zip and `decky-store.json`. To release:
 
 1. Bump `version` in `package.json` (strict SemVer, no `v`) and commit.
-2. Tag and push: `git tag vX.Y.Z && git push origin main vX.Y.Z`.
+2. Either tag and push (`git tag vX.Y.Z && git push origin main vX.Y.Z`), or open the **Release** workflow in the Actions tab and press **Run workflow** on `main`. The manual run tags the current commit with `v` + the version and releases it; it fails if that tag already exists.
 
 The tag must be `v` + the `package.json` version, or the workflow fails. Never change `name` in `plugin.json`: Decky uses it to match the installed plugin to the store entry.
 

@@ -1,20 +1,46 @@
 # Publishes the plugin for decky-store-proxy (https://github.com/paulmiro/decky-store-proxy).
-# Release: bump "version" in package.json, commit, then
-#   git tag vX.Y.Z && git push origin main vX.Y.Z
+#
+# Release: bump "version" in package.json and commit to main, then either
+#   - push the tag:  git tag vX.Y.Z && git push origin main vX.Y.Z
+#   - or press "Run workflow" on this workflow in the Actions tab (on main).
+#     It tags the current commit with v<package.json version> and releases it.
 name: Release
 
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
 
 permissions:
   contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 jobs:
   release:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Tag the release (manual runs only)
+        id: tag
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          if [[ "$GITHUB_REF" != refs/heads/main ]]; then
+            echo "::error::Manual releases must be run on main, not $GITHUB_REF"
+            exit 1
+          fi
+          tag="v$(jq -er .version package.json)"
+          if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null; then
+            echo "::error::$tag already exists. Bump the version in package.json first."
+            exit 1
+          fi
+          git tag "$tag" "$GITHUB_SHA"
+          git push origin "refs/tags/$tag"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
       - uses: pnpm/action-setup@v4
         with:
           version: 12.9.0
@@ -32,6 +58,10 @@ jobs:
           python -m unittest discover -s tests -v
       - name: Build frontend
         run: pnpm install --frozen-lockfile && pnpm run build
+
+      # A tag pushed by this workflow (GITHUB_TOKEN) does not start another run,
+      # so a manual release is published exactly once.
       - uses: paulmiro/decky-store-proxy/actions/package-plugin@79acd23cca25086b63737e30ff5e2e0687e94bc9
         with:
+          tag: ${{ steps.tag.outputs.tag }}
           release: create

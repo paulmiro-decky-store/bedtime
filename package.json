@@ -1,6 +1,6 @@
 {
   "name": "decky-bedtime",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Decky Loader plugin: set an end-of-play time from your phone; games are closed and blocked until reboot.",
   "type": "module",
   "scripts": {
